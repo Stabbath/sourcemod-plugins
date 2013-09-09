@@ -7,6 +7,7 @@
 
 new bool:isTankActive;
 new tankClient = -1;
+new Handle:burnDurationCvar;
 
 public OnPluginStart()
 {
@@ -14,6 +15,8 @@ public OnPluginStart()
 	HookEvent("round_end", Round_Event, EventHookMode_PostNoCopy);
 	HookEvent("tank_spawn", TankSpawn_Event);
 	HookEvent("player_death", PlayerDeath_Event);
+
+	burnDurationCvar = FindConVar("tank_burn_duration");
 }
 
 public Round_Event(Handle:event, const String:name[], bool:dontBroadcast)
@@ -28,7 +31,7 @@ public TankSpawn_Event(Handle:event, const String:name[], bool:dontBroadcast)
 	if (!isTankActive)
 	{
 		isTankActive = true;
-		CreateTimer(0.1, MenuRefresh_Timer, _, TIMER_REPEAT);
+		CreateTimer(0.5, MenuRefresh_Timer, _, TIMER_REPEAT);
 		UpdatePanel();
 	}
 }
@@ -68,22 +71,63 @@ public Action:MenuRefresh_Timer(Handle:timer)
 
 UpdatePanel()
 {
-	if (isTankActive)
+	static String:buffer[64];
+	static Handle:menuPanel = INVALID_HANDLE;
+	if (menuPanel != INVALID_HANDLE)
 	{
-		static Handle:menuPanel = INVALID_HANDLE;
-		if (menuPanel != INVALID_HANDLE)
+		CloseHandle(menuPanel);
+	}
+	menuPanel = CreatePanel();
+
+	// Header
+	SetPanelTitle(menuPanel, "Tank HUD"); 
+
+	// Name & Pass #
+    if (!IsFakeClient(tankClient))
+    {
+        GetClientName(tankClient, buffer, sizeof(buffer));
+        
+        if (strlen(buffer) > 25)
+        {
+            buffer[23] = '.';
+            buffer[24] = '.';
+            buffer[25] = '.';
+            buffer[26] = 0;
+        }
+        
+        Format(buffer, sizeof(buffer), "Control: %s", buffer);
+	    DrawPanelText(menuPanel, buffer);
+    }
+    else
+    {
+	    DrawPanelText(menuPanel, "Control: AI");
+    }
+
+    // Health
+	static maxHealth = RoundToNearest(GetConVarFloat(FindConVar("z_tank_health"))*1.5);
+	new health = GetClientHealth(tankClient);
+    Format(sTempString, sizeof(sTempString), "Health : %i / %.1f%%", health, 100*health/maxHealth);
+    DrawPanelText(menuPanel, sTempString);
+
+	// Rage
+	if (!IsFakeClient(tankClient)) {
+		FormatEx(buffer, sizeof(buffer), "Rage   : %d%% (Pass #%i)", GetTankFrustration(tankClient), L4D2Direct_GetTankPassedCount());
+		DrawPanelText(menuPanel, buffer);
+	}
+
+	// Fire
+    if (GetEntityFlags(tankClient) & FL_ONFIRE)
+    {
+        FormatEx(buffer, sizeof(buffer), "Burning: %.1f sec", health/GetConVarInt(burnDurationCvar));
+        DrawPanelText(menuPanel, buffer);
+    }
+
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != 2)
 		{
-			CloseHandle(menuPanel);
-			menuPanel = INVALID_HANDLE;
+			SendPanelToClient(menuPanel, tankClient, DummyHandler, 3);
 		}
-
-		menuPanel = CreatePanel();
-
-		decl String:tankRage[24];
-		Format(tankRage, sizeof(tankRage), "Rage: %d%%\nPass: #%d",
-				GetTankFrustration(tankClient), L4D2Direct_GetTankPassedCount());
-		DrawPanelText(menuPanel, tankRage);
-		SendPanelToClient(menuPanel, tankClient, DummyHandler, 1);
 	}
 }
 
