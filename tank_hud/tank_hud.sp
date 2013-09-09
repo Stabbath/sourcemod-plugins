@@ -105,9 +105,9 @@ UpdatePanel()
 
     // Health
     static maxHealth = -1;
-	if (maxHealth < 0) {
-		maxHealth = RoundToNearest(GetConVarFloat(FindConVar("z_tank_health"))*1.5);
-	}
+    if (maxHealth < 0) {
+        maxHealth = RoundToNearest(GetConVarFloat(FindConVar("z_tank_health"))*1.5);
+    }
     new health = GetClientHealth(tankClient);
     Format(buffer, sizeof(buffer), "Health : %i / %.1f%%", health, 100*health/maxHealth);
     DrawPanelText(menuPanel, buffer);
